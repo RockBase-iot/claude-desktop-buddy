@@ -1,11 +1,11 @@
-#include <M5StickCPlus.h>
+#include "hal.h"
 #include <LittleFS.h>
 #include <stdarg.h>
 #include "ble_bridge.h"
 #include "data.h"
 #include "buddy.h"
 
-TFT_eSprite spr = TFT_eSprite(&M5.Lcd);
+TFT_eSprite spr = TFT_eSprite(&HAL_DISPLAY);
 
 // Advertise as "Claude-XXXX" (last two BT MAC bytes) so multiple sticks
 // in one room are distinguishable in the desktop picker. Name persists in
@@ -23,7 +23,11 @@ static void startBt() {
 const int W = 135, H = 240;
 const int CX = W / 2;
 const int CY_BASE = 120;
+#ifdef NM28_BOARD
+const int LED_PIN = -1;          // no LED on NM28
+#else
 const int LED_PIN = 10;          // red LED, active-low
+#endif
 
 // Colors used across multiple UI surfaces
 const uint16_t HOT   = 0xFA20;   // red-orange: warnings, impatience, deny
@@ -89,17 +93,21 @@ uint32_t promptArrivedMs = 0;
 
 // Face-down = Z-axis dominant and negative. Debounced so a toss doesn't count.
 static bool isFaceDown() {
+#ifdef NM28_BOARD
+  return false;  // NM28 is a desk display; no face-down sleep needed
+#else
   float ax, ay, az;
-  M5.Imu.getAccelData(&ax, &ay, &az);
+  halImuGetAccel(&ax, &ay, &az);
   return az < -0.7f && fabsf(ax) < 0.4f && fabsf(ay) < 0.4f;
+#endif
 }
 
-static void applyBrightness() { M5.Axp.ScreenBreath(20 + brightLevel * 20); }
+static void applyBrightness() { halBrightness(brightLevel); }
 
 static void wake() {
   lastInteractMs = millis();
   if (screenOff) {
-    M5.Axp.SetLDO2(true);
+    halScreenOn(true);
     applyBrightness();
     screenOff = false;
     wakeTransitionUntil = millis() + 12000;
@@ -109,7 +117,7 @@ static void wake() {
 bool     responseSent = false;
 
 static void beep(uint16_t freq, uint16_t dur) {
-  if (settings().sound) M5.Beep.tone(freq, dur);
+  if (settings().sound) halBeep(freq, dur);
 }
 
 static void sendCmd(const char* json) {
@@ -305,7 +313,7 @@ static void drawReset() {
 void menuConfirm() {
   switch (menuSel) {
     case 0: settingsOpen = true; menuOpen = false; settingsSel = 0; break;
-    case 1: M5.Axp.PowerOff(); break;
+    case 1: halPowerOff(); break;
     case 2:
     case 3:
       menuOpen = false;
@@ -356,14 +364,13 @@ static bool            _onUsb       = false;
 static void clockRefreshRtc() {
   if (millis() - _clkLastRead < 1000) return;
   _clkLastRead = millis();
-  _onUsb = M5.Axp.GetVBusVoltage() > 4.0f;
-  M5.Rtc.GetTime(&_clkTm);
-  M5.Rtc.GetDate(&_clkDt);
+  _onUsb = halOnUsb();
+  halRtcGet(&_clkTm, &_clkDt);
 }
 
 static void clockUpdateOrient() {
   float ax, ay, az;
-  M5.Imu.getAccelData(&ax, &ay, &az);
+  halImuGetAccel(&ax, &ay, &az);
   uint8_t lock = settings().clockRot;
   if (lock == 1) { clockOrient = 0; return; }
   if (lock == 2) {
@@ -432,10 +439,12 @@ static void drawClock() {
   // Landscape: 240×135 direct-to-LCD. Full fill only on entry; after that
   // text glyph bg cells repaint themselves and the pet box (small, ~90×50)
   // gets a fillRect each pet tick — small enough not to tear.
-  M5.Lcd.setRotation(clockOrient);
+  // NM28 is always landscape (sprite path); skip this block.
+#ifndef NM28_BOARD
+  HAL_DISPLAY.setRotation(clockOrient);
   static uint8_t lastSec = 0xFF;
   bool repaint = paintedOrient != clockOrient;
-  if (repaint) { M5.Lcd.fillScreen(p.bg); paintedOrient = clockOrient; lastSec = 0xFF; }
+  if (repaint) { HAL_DISPLAY.fillScreen(p.bg); paintedOrient = clockOrient; lastSec = 0xFF; }
 
   // Seconds tick at 1Hz; redrawing 3 strings at 60fps is 180 SPI ops/sec
   // for nothing. Gate on the second changing (or full repaint).
@@ -443,12 +452,12 @@ static void drawClock() {
     lastSec = _clkTm.Seconds;
     char wdl[12]; snprintf(wdl, sizeof(wdl), "%s %s %02u", DOW[clockDow()], MON[mi], _clkDt.Date);
     char ssl[3]; snprintf(ssl, sizeof(ssl), "%02u", _clkTm.Seconds);
-    M5.Lcd.setTextDatum(MC_DATUM);
-    M5.Lcd.setTextSize(3); M5.Lcd.setTextColor(p.text, p.bg);    M5.Lcd.drawString(hm, 170, 42);
-    M5.Lcd.setTextSize(2); M5.Lcd.setTextColor(p.textDim, p.bg); M5.Lcd.drawString(ssl, 170, 72);
-                                                                  M5.Lcd.drawString(wdl, 170, 102);
-    M5.Lcd.setTextDatum(TL_DATUM);
-    M5.Lcd.setTextSize(1);
+    HAL_DISPLAY.setTextDatum(MC_DATUM);
+    HAL_DISPLAY.setTextSize(3); HAL_DISPLAY.setTextColor(p.text, p.bg);    HAL_DISPLAY.drawString(hm, 170, 42);
+    HAL_DISPLAY.setTextSize(2); HAL_DISPLAY.setTextColor(p.textDim, p.bg); HAL_DISPLAY.drawString(ssl, 170, 72);
+                                                                            HAL_DISPLAY.drawString(wdl, 170, 102);
+    HAL_DISPLAY.setTextDatum(TL_DATUM);
+    HAL_DISPLAY.setTextSize(1);
   }
 
   // Pet on left at 5 fps. Clear includes the overlay-particle zone above
@@ -462,18 +471,19 @@ static void drawClock() {
       // hardcode BUDDY_X_CENTER=67 / BUDDY_Y_OVERLAY=6 for particles so
       // keep portrait coords and just swap the surface — pet lands
       // upper-left of landscape, which is where we want it anyway.
-      M5.Lcd.fillRect(0, 0, 115, 90, p.bg);
-      buddyRenderTo(&M5.Lcd, activeState);
+      HAL_DISPLAY.fillRect(0, 0, 115, 90, p.bg);
+      buddyRenderTo(&HAL_DISPLAY, activeState);
     } else {
       // Full-frame GIFs paint every pixel (transparent → pal.bg), so a
       // per-tick clear just adds a visible black flash between wipe and
       // last scanline. The entry fillScreen on paintedOrient change
       // already covers the surround.
       characterSetState(activeState);
-      characterRenderTo(&M5.Lcd, 57, 45);
+      characterRenderTo(&HAL_DISPLAY, 57, 45);
     }
   }
-  M5.Lcd.setRotation(0);
+  HAL_DISPLAY.setRotation(0);
+#endif // NM28_BOARD
 }
 
 PersonaState derive(const TamaState& s) {
@@ -490,12 +500,16 @@ void triggerOneShot(PersonaState s, uint32_t durMs) {
 }
 
 bool checkShake() {
+#ifdef NM28_BOARD
+  return false;  // NM28 IMU axis mapping differs; disable shake to avoid false triggers
+#else
   float ax, ay, az;
-  M5.Imu.getAccelData(&ax, &ay, &az);
+  halImuGetAccel(&ax, &ay, &az);
   float mag = sqrtf(ax*ax + ay*ay + az*az);
   float delta = fabsf(mag - accelBaseline);
   accelBaseline = accelBaseline * 0.95f + mag * 0.05f;
   return delta > 0.8f;
+#endif
 }
 
 
@@ -593,6 +607,7 @@ void drawInfo() {
   } else if (infoPage == 3) {
     _infoHeader(p, y, "DEVICE", infoPage);
 
+#ifndef NM28_BOARD
     int vBat_mV = (int)(M5.Axp.GetBatVoltage() * 1000);
     int iBat_mA = (int)M5.Axp.GetBatCurrent();
     int vBus_mV = (int)(M5.Axp.GetVBusVoltage() * 1000);
@@ -617,6 +632,12 @@ void drawInfo() {
     ln("  current  %+dmA", iBat_mA);
     if (usb) ln("  usb in   %d.%02dV", vBus_mV/1000, (vBus_mV%1000)/10);
     y += 8;
+#else
+    bool usb = halOnUsb();
+    spr.setTextColor(p.textDim, p.bg);
+    ln("  usb      %s", usb ? "yes" : "no");
+    y += 8;
+#endif
 
     spr.setTextColor(p.text, p.bg);
     ln("SYSTEM");
@@ -627,7 +648,9 @@ void drawInfo() {
     ln("  heap     %uKB", ESP.getFreeHeap() / 1024);
     ln("  bright   %u/4", brightLevel);
     ln("  bt       %s", settings().bt ? (dataBtActive() ? "linked" : "on") : "off");
+#ifndef NM28_BOARD
     ln("  temp     %dC", (int)M5.Axp.GetTempInAXP192());
+#endif
 
   } else if (infoPage == 4) {
     _infoHeader(p, y, "BLUETOOTH", infoPage);
@@ -936,13 +959,9 @@ void drawHUD() {
 }
 
 void setup() {
-  M5.begin();
-  M5.Lcd.setRotation(0);
-  M5.Imu.Init();
-  M5.Beep.begin();
+  halBegin();
   startBt();
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, HIGH);   // off
+  if (LED_PIN >= 0) { pinMode(LED_PIN, OUTPUT); digitalWrite(LED_PIN, HIGH); }  // off
   applyBrightness();
   lastInteractMs = millis();
   statsLoad();
@@ -978,7 +997,7 @@ void setup() {
       spr.drawString("a buddy appears", W/2, H/2 + 12);
     }
     spr.setTextDatum(TL_DATUM); spr.setTextSize(1);
-    spr.pushSprite(0, 0);
+    spr.pushSprite(HAL_SPR_X, HAL_SPR_Y);
     delay(1800);
   }
 
@@ -986,8 +1005,7 @@ void setup() {
 }
 
 void loop() {
-  M5.update();
-  M5.Beep.update();
+  halUpdate();
   t++;
   uint32_t now = millis();
 
@@ -1002,10 +1020,12 @@ void loop() {
   if ((int32_t)(now - oneShotUntil) >= 0) activeState = baseState;
 
   // LED: pulse on attention, otherwise off
-  if (activeState == P_ATTENTION && settings().led) {
-    digitalWrite(LED_PIN, (now / 400) % 2 ? LOW : HIGH);
-  } else {
-    digitalWrite(LED_PIN, HIGH);
+  if (LED_PIN >= 0) {
+    if (activeState == P_ATTENTION && settings().led) {
+      digitalWrite(LED_PIN, (now / 400) % 2 ? LOW : HIGH);
+    } else {
+      digitalWrite(LED_PIN, HIGH);
+    }
   }
 
   // shake → dizzy + force scenario advance
@@ -1043,26 +1063,26 @@ void loop() {
   // Button-press wake. Track which button woke the screen so its full
   // press cycle (including long-press) is swallowed — you don't want
   // BtnA-to-wake to also cycle displayMode or open the menu.
-  if (M5.BtnA.isPressed() || M5.BtnB.isPressed()) {
+  if (halBtnA_isPressed() || halBtnB_isPressed()) {
     if (screenOff) {
-      if (M5.BtnA.isPressed()) swallowBtnA = true;
-      if (M5.BtnB.isPressed()) swallowBtnB = true;
+      if (halBtnA_isPressed()) swallowBtnA = true;
+      if (halBtnB_isPressed()) swallowBtnB = true;
     }
     wake();
   }
 
   // AXP power button (left side): short-press toggles screen off.
   // Long-press (6s) still powers off the device via AXP hardware.
-  if (M5.Axp.GetBtnPress() == 0x02) {
+  if (halPwrBtnEvent() == 0x02) {
     if (screenOff) {
       wake();
     } else {
-      M5.Axp.SetLDO2(false);
+      halScreenOn(false);
       screenOff = true;
     }
   }
 
-  if (M5.BtnA.pressedFor(600) && !btnALong && !swallowBtnA) {
+  if (halBtnA_pressedFor(600) && !btnALong && !swallowBtnA) {
     btnALong = true;
     beep(800, 60);
     if (resetOpen) { resetOpen = false; }
@@ -1074,7 +1094,7 @@ void loop() {
     }
     Serial.println(menuOpen ? "menu open" : "menu close");
   }
-  if (M5.BtnA.wasReleased()) {
+  if (halBtnA_wasReleased()) {
     if (!btnALong && !swallowBtnA) {
       if (inPrompt) {
         char cmd[96];
@@ -1106,7 +1126,7 @@ void loop() {
   }
 
   // BtnB: pet → heart
-  if (M5.BtnB.wasPressed()) {
+  if (halBtnB_wasPressed()) {
     if (swallowBtnB) { swallowBtnB = false; }
     else
     if (inPrompt) {
@@ -1189,6 +1209,7 @@ void loop() {
     // skip sprite render — face-down, powered off, or landscape clock
     // (which draws direct-to-LCD below)
   } else if (buddyMode) {
+    spr.fillSprite(0x0000);  // clear full sprite before buddy draws partial area
     buddyTick(activeState);
   } else if (characterLoaded()) {
     characterSetState(activeState);
@@ -1226,7 +1247,7 @@ void loop() {
     if (resetOpen) drawReset();
     else if (settingsOpen) drawSettings();
     else if (menuOpen) drawMenu();
-    spr.pushSprite(0, 0);
+    spr.pushSprite(HAL_SPR_X, HAL_SPR_Y);
   }
 
   // Face-down nap: dim immediately, pause animations, accumulate sleep time.
@@ -1243,7 +1264,7 @@ void loop() {
   if (!napping && faceDownFrames >= 15) {
     napping = true;
     napStartMs = now;
-    M5.Axp.ScreenBreath(8);
+    halBrightness(0);   // dim to minimum (level 0 = 20%)
     dimmed = true;
   } else if (napping && faceDownFrames <= -8) {
     napping = false;
@@ -1257,7 +1278,7 @@ void loop() {
   // No auto-off on USB power — clock face wants to stay visible while charging.
   if (!screenOff && !inPrompt && !_onUsb
       && millis() - lastInteractMs > SCREEN_OFF_MS) {
-    M5.Axp.SetLDO2(false);
+    halScreenOn(false);
     screenOff = true;
   }
 

@@ -1,6 +1,6 @@
 #include "../buddy.h"
 #include "../buddy_common.h"
-#include <M5StickCPlus.h>
+#include "../hal.h"
 #include <string.h>
 
 extern TFT_eSprite spr;
@@ -96,7 +96,7 @@ static void doBusy(uint32_t t) {
   uint8_t beat = (t / 5) % sizeof(SEQ);
   buddyPrintSprite(P[SEQ[beat]], 5, 0, 0xF800);
 
-  // Gold coins clinking â€” '$' and '.' alternate
+  // Gold coins clinking â€?'$' and '.' alternate
   static const char* const COINS[] = { "$  ", "$$ ", "$$$", " $$", "  $", "   " };
   buddySetColor(BUDDY_YEL);
   buddySetCursor(BUDDY_X_CENTER + 22, BUDDY_Y_OVERLAY + 14);

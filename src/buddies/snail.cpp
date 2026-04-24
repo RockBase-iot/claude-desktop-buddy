@@ -1,13 +1,13 @@
 #include "../buddy.h"
 #include "../buddy_common.h"
-#include <M5StickCPlus.h>
+#include "../hal.h"
 #include <string.h>
 
 extern TFT_eSprite spr;
 
 namespace snail {
 
-// ─── SLEEP ───  ~12s cycle, 6 poses — tucked in shell, snoring slime bubbles
+// ─── SLEEP ───  ~12s cycle, 6 poses —tucked in shell, snoring slime bubbles
 static void doSleep(uint32_t t) {
   static const char* const TUCK[5]    = { "            ", "     .--.   ", "    ( zz )  ", "   `-____-` ", "  ~~~~~~~~  " };
   static const char* const BREATHE[5] = { "            ", "     .--.   ", "    ( -- )  ", "   `-____-` ", "  ~~~~~~~~  " };
@@ -42,7 +42,7 @@ static void doSleep(uint32_t t) {
   buddyPrint("z");
 }
 
-// ─── IDLE ───  ~14s cycle, 10 poses — antennae wiggle, eye peeks, slime trail
+// ─── IDLE ───  ~14s cycle, 10 poses —antennae wiggle, eye peeks, slime trail
 static void doIdle(uint32_t t) {
   static const char* const REST[5]    = { "  \\\\  /     ", "    .--.    ", "  _( oo )_  ", " (___@@___) ", "  ~~~~~~~~  " };
   static const char* const LOOK_L[5]  = { "  \\\\  /     ", "    .--.    ", "  _(<<  )_  ", " (___@@___) ", "  ~~~~~~~~  " };
@@ -74,7 +74,7 @@ static void doIdle(uint32_t t) {
   }
 }
 
-// ─── BUSY ───  ~10s cycle, 6 poses — shell spiral spinning, focused eyes, dot ticker
+// ─── BUSY ───  ~10s cycle, 6 poses —shell spiral spinning, focused eyes, dot ticker
 static void doBusy(uint32_t t) {
   static const char* const SPIRAL_A[5]= { "  \\\\  /     ", "    .o-.    ", "  _( vv )_  ", " (___--___) ", "  ~~~~~~~~  " };
   static const char* const SPIRAL_B[5]= { "  \\\\  /     ", "    .-o.    ", "  _( vv )_  ", " (___--___) ", "  ~~~~~~~~  " };
@@ -96,7 +96,7 @@ static void doBusy(uint32_t t) {
   buddyPrint(DOTS[t % 6]);
 }
 
-// ─── ATTENTION ───  ~8s cycle, 6 poses — antennae periscope up, scanning
+// ─── ATTENTION ───  ~8s cycle, 6 poses —antennae periscope up, scanning
 static void doAttention(uint32_t t) {
   static const char* const ALERT[5]   = { "  ||  ||    ", "    .--.    ", "  _( OO )_  ", " (___OO___) ", "  ~~~~~~~~  " };
   static const char* const SCAN_L[5]  = { "  \\\\  \\\\    ", "    .--.    ", "  _(OO  )_  ", " (___OO___) ", "  ~~~~~~~~  " };
@@ -126,7 +126,7 @@ static void doAttention(uint32_t t) {
   }
 }
 
-// ─── CELEBRATE ───  ~5.6s cycle, 6 poses — shell hops, antennae fling, confetti rain
+// ─── CELEBRATE ───  ~5.6s cycle, 6 poses —shell hops, antennae fling, confetti rain
 static void doCelebrate(uint32_t t) {
   static const char* const CROUCH[5]  = { "  \\\\  /     ", "    .--.    ", "  _( ^^ )_  ", " (___ww___) ", " /~~~~~~~~\\ " };
   static const char* const JUMP[5]    = { "  \\^  ^/    ", "   _.--._   ", "  ( ^  ^ )  ", " (___ww___) ", "  ~~~~~~~~  " };
@@ -153,7 +153,7 @@ static void doCelebrate(uint32_t t) {
   }
 }
 
-// ─── DIZZY ───  ~5.6s cycle, 5 poses — shell wobble, antennae droop, orbiting stars
+// ─── DIZZY ───  ~5.6s cycle, 5 poses —shell wobble, antennae droop, orbiting stars
 static void doDizzy(uint32_t t) {
   static const char* const TILT_L[5]  = { "  \\\\\\       ", "   .--.     ", "  ( @x )    ", " (___~v___) ", "  ~~~~~~~~  " };
   static const char* const TILT_R[5]  = { "       ///  ", "     .--.   ", "    ( x@ )  ", " (___v~___) ", "  ~~~~~~~~  " };
@@ -179,7 +179,7 @@ static void doDizzy(uint32_t t) {
   buddyPrint("*");
 }
 
-// ─── HEART ───  ~10s cycle, 5 poses — twined antennae, heart eyes, rising hearts
+// ─── HEART ───  ~10s cycle, 5 poses —twined antennae, heart eyes, rising hearts
 static void doHeart(uint32_t t) {
   static const char* const DREAMY[5]  = { "  \\\\  /     ", "    .--.    ", "  _( ^^ )_  ", " (___ww___) ", "  ~~~~~~~~  " };
   static const char* const BLUSH[5]   = { "  \\\\  /     ", "    .--.    ", "  _(#^^#)_  ", " (___ww___) ", "  ~~~~~~~~  " };

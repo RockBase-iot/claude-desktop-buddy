@@ -17,7 +17,10 @@ wakes when sessions start, gets visibly impatient when an approval prompt is
 waiting, and lets you approve or deny right from the device.
 
 <p align="center">
-  <img src="docs/device.jpg" alt="M5StickC Plus running the buddy firmware" width="500">
+<table><tr>
+<td align="center"><img src="docs/device.jpg" alt="M5StickC Plus running the buddy firmware" height="300"></td>
+<td align="center"><img src="docs/nm-display-28.png" alt="NM 2.8-inch display board running the buddy firmware" height="300"></td>
+</tr></table>
 </p>
 
 ## Hardware
