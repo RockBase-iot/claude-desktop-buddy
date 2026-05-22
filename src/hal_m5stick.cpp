@@ -1,6 +1,6 @@
 // hal_m5stick.cpp — M5StickC Plus HAL implementation
-// Only compiled when NM28_BOARD is NOT defined.
-#ifndef NM28_BOARD
+// Only compiled when neither NM28_BOARD nor NMTV154_BOARD is defined.
+#if !defined(NM28_BOARD) && !defined(NMTV154_BOARD)
 
 #include "hal.h"
 
@@ -41,4 +41,4 @@ void halBeep(uint16_t freq, uint16_t dur) {
   M5.Beep.tone(freq, dur);
 }
 
-#endif // NM28_BOARD
+#endif // !NM28_BOARD && !NMTV154_BOARD

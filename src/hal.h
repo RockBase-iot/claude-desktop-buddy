@@ -2,12 +2,13 @@
 #include <stdint.h>
 
 // ---------------------------------------------------------------------------
-// Hardware Abstraction Layer — lets one source tree target both
+// Hardware Abstraction Layer — lets one source tree target:
 //   [env:m5stickc-plus]  (original M5StickC Plus, 135×240)
 //   [env:nm-display-28]  (NM 2.8" ESP32-S3 board, 320×240)
+//   [env:nm-tv-154]      (NM TV 1.54" ESP32 board, 240×240 square)
 //
-// Define NM28_BOARD in build_flags to activate the NM28 path.
-// Everything that touched M5.xxx in main.cpp now calls hal___() instead.
+// Define NM28_BOARD or NMTV154_BOARD in build_flags to activate the
+// corresponding path. Default (no define) uses the M5StickC Plus path.
 // ---------------------------------------------------------------------------
 
 #ifdef NM28_BOARD
@@ -30,6 +31,32 @@
   struct RTC_DateTypeDef { uint8_t WeekDay, Month, Date; uint16_t Year; };
 
   // Color constants that M5StickCPlus.h normally provides via TFT_eSPI
+  #ifndef GREEN
+  #define GREEN 0x07E0
+  #endif
+  #ifndef RED
+  #define RED   0xF800
+  #endif
+
+#elif defined(NMTV154_BOARD)
+  // ── NMTV154: bare TFT_eSPI on ESP32 classic, ST7789 240×240 square ──────
+  #include <TFT_eSPI.h>
+  extern TFT_eSPI nmtv154_display;
+  #define HAL_DISPLAY  nmtv154_display
+
+  // Physical screen dimensions (portrait, square panel)
+  #define HAL_SCREEN_W 240
+  #define HAL_SCREEN_H 240
+
+  // Centre the 135-px-wide sprite on the 240-px-wide screen
+  #define HAL_SPR_X    52
+  #define HAL_SPR_Y    0
+
+  // Minimal RTC structs (no hardware RTC; clock face stays dormant)
+  struct RTC_TimeTypeDef { uint8_t Hours, Minutes, Seconds; };
+  struct RTC_DateTypeDef { uint8_t WeekDay, Month, Date; uint16_t Year; };
+
+  // Color constants provided by TFT_eSPI, not by M5
   #ifndef GREEN
   #define GREEN 0x07E0
   #endif

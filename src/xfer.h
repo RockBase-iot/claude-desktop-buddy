@@ -111,7 +111,7 @@ inline bool xferCommand(JsonDocument& doc) {
 
   if (strcmp(cmd, "status") == 0) {
     // Dump everything the info screens show.
-#ifndef NM28_BOARD
+#if !defined(NM28_BOARD) && !defined(NMTV154_BOARD)
     int vBat = (int)(M5.Axp.GetBatVoltage() * 1000);
     int iBat = (int)M5.Axp.GetBatCurrent();
     int vBus = (int)(M5.Axp.GetVBusVoltage() * 1000);

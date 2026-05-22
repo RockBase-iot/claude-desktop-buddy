@@ -23,8 +23,8 @@ static void startBt() {
 const int W = 135, H = 240;
 const int CX = W / 2;
 const int CY_BASE = 120;
-#ifdef NM28_BOARD
-const int LED_PIN = -1;          // no LED on NM28
+#if defined(NM28_BOARD) || defined(NMTV154_BOARD)
+const int LED_PIN = -1;          // no LED on NM28 / NMTV154
 #else
 const int LED_PIN = 10;          // red LED, active-low
 #endif
@@ -93,8 +93,8 @@ uint32_t promptArrivedMs = 0;
 
 // Face-down = Z-axis dominant and negative. Debounced so a toss doesn't count.
 static bool isFaceDown() {
-#ifdef NM28_BOARD
-  return false;  // NM28 is a desk display; no face-down sleep needed
+#if defined(NM28_BOARD) || defined(NMTV154_BOARD)
+  return false;  // desk display; no face-down sleep needed
 #else
   float ax, ay, az;
   halImuGetAccel(&ax, &ay, &az);
@@ -439,8 +439,8 @@ static void drawClock() {
   // Landscape: 240×135 direct-to-LCD. Full fill only on entry; after that
   // text glyph bg cells repaint themselves and the pet box (small, ~90×50)
   // gets a fillRect each pet tick — small enough not to tear.
-  // NM28 is always landscape (sprite path); skip this block.
-#ifndef NM28_BOARD
+  // NM28/NMTV154 are desk displays (sprite path); skip landscape block.
+#if !defined(NM28_BOARD) && !defined(NMTV154_BOARD)
   HAL_DISPLAY.setRotation(clockOrient);
   static uint8_t lastSec = 0xFF;
   bool repaint = paintedOrient != clockOrient;
@@ -483,7 +483,7 @@ static void drawClock() {
     }
   }
   HAL_DISPLAY.setRotation(0);
-#endif // NM28_BOARD
+#endif // !NM28_BOARD && !NMTV154_BOARD
 }
 
 PersonaState derive(const TamaState& s) {
@@ -500,8 +500,8 @@ void triggerOneShot(PersonaState s, uint32_t durMs) {
 }
 
 bool checkShake() {
-#ifdef NM28_BOARD
-  return false;  // NM28 IMU axis mapping differs; disable shake to avoid false triggers
+#if defined(NM28_BOARD) || defined(NMTV154_BOARD)
+  return false;  // no IMU on NM28/NMTV154; disable shake
 #else
   float ax, ay, az;
   halImuGetAccel(&ax, &ay, &az);
@@ -607,7 +607,7 @@ void drawInfo() {
   } else if (infoPage == 3) {
     _infoHeader(p, y, "DEVICE", infoPage);
 
-#ifndef NM28_BOARD
+#if !defined(NM28_BOARD) && !defined(NMTV154_BOARD)
     int vBat_mV = (int)(M5.Axp.GetBatVoltage() * 1000);
     int iBat_mA = (int)M5.Axp.GetBatCurrent();
     int vBus_mV = (int)(M5.Axp.GetVBusVoltage() * 1000);
@@ -637,7 +637,7 @@ void drawInfo() {
     spr.setTextColor(p.textDim, p.bg);
     ln("  usb      %s", usb ? "yes" : "no");
     y += 8;
-#endif
+#endif // !NM28_BOARD && !NMTV154_BOARD
 
     spr.setTextColor(p.text, p.bg);
     ln("SYSTEM");
@@ -648,7 +648,7 @@ void drawInfo() {
     ln("  heap     %uKB", ESP.getFreeHeap() / 1024);
     ln("  bright   %u/4", brightLevel);
     ln("  bt       %s", settings().bt ? (dataBtActive() ? "linked" : "on") : "off");
-#ifndef NM28_BOARD
+#if !defined(NM28_BOARD) && !defined(NMTV154_BOARD)
     ln("  temp     %dC", (int)M5.Axp.GetTempInAXP192());
 #endif
 
