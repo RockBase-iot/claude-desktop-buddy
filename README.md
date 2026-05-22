@@ -18,7 +18,7 @@ waiting, and lets you approve or deny right from the device.
 
 <p align="center">
 <table><tr>
-<td align="center"><img src="docs/device.jpg" alt="M5StickC Plus running the buddy firmware" height="300"></td>
+<td align="center"><img src="docs/nmtv154.jpg" alt="NM TV 1.54-inch display board running the buddy firmware" height="300"></td>
 <td align="center"><img src="docs/nm-display-28.png" alt="NM 2.8-inch display board running the buddy firmware" height="300"></td>
 </tr></table>
 </p>
