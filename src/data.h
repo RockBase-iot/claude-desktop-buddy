@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include "ble_bridge.h"
 #include "xfer.h"
+#include "serial_frame.h"
 
 struct TamaState {
   uint8_t  sessionsTotal;
@@ -136,7 +137,12 @@ struct _LineBuf {
     while (s.available()) {
       char c = s.read();
       if (c == '\n' || c == '\r') {
-        if (len > 0) { buf[len]=0; if (buf[0]=='{') _applyJson(buf, out); len=0; }
+        if (len > 0) {
+          buf[len] = 0;
+          const char* payload = serialFramePayload(buf);
+          if (payload) _applyJson(payload, out);
+          len = 0;
+        }
       } else if (len < N-1) {
         buf[len++] = c;
       }

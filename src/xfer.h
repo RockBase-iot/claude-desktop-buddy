@@ -4,6 +4,7 @@
 #include "ble_bridge.h"
 #include <mbedtls/base64.h>
 #include <ArduinoJson.h>
+#include "transport.h"
 
 static File     _xFile;
 static uint32_t _xExpected = 0, _xWritten = 0;
@@ -17,8 +18,7 @@ static uint32_t _xTotal = 0, _xTotalWritten = 0;
 static void _xAck(const char* what, bool ok, uint32_t n = 0) {
   char b[64];
   int len = snprintf(b, sizeof(b), "{\"ack\":\"%s\",\"ok\":%s,\"n\":%lu}\n", what, ok?"true":"false", (unsigned long)n);
-  Serial.write(b, len);
-  bleWrite((const uint8_t*)b, len);
+  transportWriteJsonBytes(b, len);
 }
 
 static uint32_t _xWipeDir(const char* dir) {
@@ -138,8 +138,7 @@ inline bool xferCommand(JsonDocument& doc) {
       stats().approvals, stats().denials, statsMedianVelocity(),
       (unsigned long)stats().napSeconds, stats().level
     );
-    Serial.write(b, len);
-    bleWrite((const uint8_t*)b, len);
+    transportWriteJsonBytes(b, len);
     return true;
   }
 
@@ -174,8 +173,7 @@ inline bool xferCommand(JsonDocument& doc) {
         "{\"ack\":\"char_begin\",\"ok\":false,\"n\":%lu,\"error\":\"need %luK, have %luK\"}\n",
         (unsigned long)available, (unsigned long)(_xTotal/1024), (unsigned long)(available/1024)
       );
-      Serial.write(b, len);
-      bleWrite((const uint8_t*)b, len);
+      transportWriteJsonBytes(b, len);
       return true;
     }
 

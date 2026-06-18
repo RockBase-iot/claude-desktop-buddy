@@ -3,6 +3,7 @@
 #ifdef NMTV154_BOARD
 
 #include "hal.h"
+#include "touch_gesture.h"
 #include <Arduino.h>
 #include <driver/ledc.h>
 
@@ -15,7 +16,7 @@
 #define TOUCH_THRESHOLD_PRESS 90
 
 // Physical BOOT button on GPIO0 (active-low) — used as BtnB fallback
-#define PIN_BTN_B    0
+#define PIN_BTN_B    0   // debug/probing only; BtnB is synthesized by double-tap
 
 #define PIN_LCD_BL   19   // Backlight — active LOW: LOW=ON, HIGH=OFF
 #define PIN_LCD_PWR  21   // Screen power rail — active LOW: LOW=ON
@@ -47,25 +48,11 @@ static void _setBl(uint8_t level) {
 //   touchRead() returns raw counts; lower = more finger contact.
 // Button B — GPIO0 BOOT button (INPUT_PULLUP), active-low
 // ---------------------------------------------------------------------------
-static bool     _btnDown    = false;
-static bool     _btnRelease = false;  // true for exactly one halUpdate() tick
-static uint32_t _btnDownMs  = 0;
-
-static bool     _btnBDown    = false;
-static bool     _btnBRelease = false;
+static TouchGestureButton _touchBtn;
 
 static void _btnScan() {
-    // --- BtnA: capacitive touch ---
-    bool now = (touchRead(PIN_TOUCH_A) < TOUCH_THRESHOLD_PRESS);
-    _btnRelease = (!now && _btnDown);
-    if (now && !_btnDown) _btnDownMs = millis();
-    if (!now)             _btnDownMs = 0;
-    _btnDown = now;
-
-    // --- BtnB: BOOT button ---
-    bool nowB   = (digitalRead(PIN_BTN_B) == LOW);
-    _btnBRelease = (!nowB && _btnBDown);
-    _btnBDown    = nowB;
+    bool touched = (touchRead(PIN_TOUCH_A) < TOUCH_THRESHOLD_PRESS);
+    _touchBtn.update(touched, millis());
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +81,7 @@ void halBegin() {
     _setBl(4);
 
     // BtnB: BOOT button (capacitive touch needs no pinMode)
-    pinMode(PIN_BTN_B, INPUT_PULLUP);
+    pinMode(PIN_BTN_B, INPUT_PULLUP);  // not part of the user-facing button map
 }
 
 void halUpdate() {
@@ -102,14 +89,14 @@ void halUpdate() {
 }
 
 // --- Buttons ---
-bool halBtnA_isPressed()             { return _btnDown; }
-bool halBtnA_wasReleased()           { return _btnRelease; }
+bool halBtnA_isPressed()             { return _touchBtn.aIsPressed(); }
+bool halBtnA_wasReleased()           { return _touchBtn.aWasReleased(); }
 bool halBtnA_pressedFor(uint32_t ms) {
-    return _btnDown && _btnDownMs && (millis() - _btnDownMs >= ms);
+    return _touchBtn.aPressedFor(ms, millis());
 }
-// BtnB: GPIO0 BOOT button
-bool halBtnB_isPressed()             { return _btnBDown; }
-bool halBtnB_wasPressed()            { return _btnBRelease; }
+// BtnB: double-tap the capacitive touch button.
+bool halBtnB_isPressed()             { return _touchBtn.bIsPressed(); }
+bool halBtnB_wasPressed()            { return _touchBtn.bWasPressed(); }
 
 // --- Power / Screen ---
 void halBrightness(uint8_t level) {

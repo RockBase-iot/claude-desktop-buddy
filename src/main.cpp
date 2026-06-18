@@ -4,6 +4,7 @@
 #include "ble_bridge.h"
 #include "data.h"
 #include "buddy.h"
+#include "transport.h"
 
 TFT_eSprite spr = TFT_eSprite(&HAL_DISPLAY);
 
@@ -121,10 +122,7 @@ static void beep(uint16_t freq, uint16_t dur) {
 }
 
 static void sendCmd(const char* json) {
-  Serial.println(json);
-  size_t n = strlen(json);
-  bleWrite((const uint8_t*)json, n);
-  bleWrite((const uint8_t*)"\n", 1);
+  transportWriteJson(json);
 }
 const uint8_t INFO_PAGES = 6;
 const uint8_t INFO_PG_BUTTONS = 1;
@@ -329,6 +327,27 @@ void menuConfirm() {
 
 void drawMenu() {
   const Palette& p = characterPalette();
+#ifdef NMTV154_BOARD
+  const int mw = 180, mh = 16 + MENU_N * 18 + MENU_HINT_H;
+  const int mx = (HAL_SCREEN_W - mw) / 2, my = (HAL_SCREEN_H - mh) / 2;
+  HAL_DISPLAY.fillRect(mx - 4, my - 4, mw + 8, mh + 8, p.bg);
+  HAL_DISPLAY.fillRoundRect(mx, my, mw, mh, 4, PANEL);
+  HAL_DISPLAY.drawRoundRect(mx, my, mw, mh, 4, p.textDim);
+  HAL_DISPLAY.setTextSize(1);
+  for (int i = 0; i < MENU_N; i++) {
+    bool sel = (i == menuSel);
+    HAL_DISPLAY.setTextColor(sel ? p.text : p.textDim, PANEL);
+    HAL_DISPLAY.setCursor(mx + 10, my + 10 + i * 18);
+    HAL_DISPLAY.print(sel ? "> " : "  ");
+    HAL_DISPLAY.print(menuItems[i]);
+    if (i == 4) HAL_DISPLAY.print(dataDemo() ? "  on" : "  off");
+  }
+  HAL_DISPLAY.drawFastHLine(mx + 8, my + mh - 16, mw - 16, p.textDim);
+  HAL_DISPLAY.setTextColor(p.textDim, PANEL);
+  HAL_DISPLAY.setCursor(mx + 10, my + mh - 10);
+  HAL_DISPLAY.print("A: Next    Double: Choose");
+  return;
+#else
   int mw = 118, mh = 16 + MENU_N * 14 + MENU_HINT_H;
   int mx = (W - mw) / 2, my = (H - mh) / 2;
   spr.fillRoundRect(mx, my, mw, mh, 4, PANEL);
@@ -343,6 +362,7 @@ void drawMenu() {
     if (i == 4) spr.print(dataDemo() ? "  on" : "  off");
   }
   drawMenuHints(p, mx, mw, my + mh - 12);
+#endif
 }
 
 // Clock orientation: gravity along the in-plane X axis means the stick is
@@ -1244,10 +1264,42 @@ void loop() {
     else if (displayMode == DISP_INFO) drawInfo();
     else if (displayMode == DISP_PET) drawPet();
     else if (settings().hud) drawHUD();
+#if defined(NMTV154_BOARD)
+    static bool nmtv154MenuWasOpen = false;
+    static bool nmtv154MenuDirty = true;
+    static uint8_t nmtv154MenuLastSel = 0xFF;
+    static bool nmtv154MenuLastDemo = false;
+    if (resetOpen) drawReset();
+    else if (settingsOpen) drawSettings();
+    else if (menuOpen) {
+      bool demoNow = dataDemo();
+      if (!nmtv154MenuWasOpen || nmtv154MenuLastSel != menuSel || nmtv154MenuLastDemo != demoNow) {
+        nmtv154MenuDirty = true;
+      }
+      if (nmtv154MenuDirty) {
+        drawMenu();
+        nmtv154MenuLastSel = menuSel;
+        nmtv154MenuLastDemo = demoNow;
+        nmtv154MenuDirty = false;
+      }
+    }
+    if (menuOpen) {
+      nmtv154MenuWasOpen = true;
+    } else {
+      if (nmtv154MenuWasOpen) {
+        HAL_DISPLAY.fillScreen(characterPalette().bg);
+        nmtv154MenuWasOpen = false;
+        nmtv154MenuDirty = true;
+        nmtv154MenuLastSel = 0xFF;
+      }
+      spr.pushSprite(HAL_SPR_X, HAL_SPR_Y);
+    }
+#else
     if (resetOpen) drawReset();
     else if (settingsOpen) drawSettings();
     else if (menuOpen) drawMenu();
     spr.pushSprite(HAL_SPR_X, HAL_SPR_Y);
+#endif
   }
 
   // Face-down nap: dim immediately, pause animations, accumulate sleep time.
